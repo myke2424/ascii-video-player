@@ -45,7 +45,7 @@ type Frame struct {
 func getTerminalSize() (int, int) {
 	width, height, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		return 160, 90
+		return 80, 24
 	}
 	return width, height
 }
@@ -58,13 +58,13 @@ func getVideoFrameRate(videoFilePath string) float64 {
 	cmd.Stdout = &stdout
 
 	if err := cmd.Run(); err != nil {
-		return 30
+		return 30.0
 	}
 
 	frameRateStr := strings.TrimSpace(stdout.String())
 	frameRate, err := strconv.ParseFloat(frameRateStr, 64)
 	if err != nil {
-		return 30
+		return 30.0
 	}
 
 	return frameRate
