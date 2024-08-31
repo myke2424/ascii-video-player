@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/qeesung/image2ascii/convert"
@@ -80,7 +81,9 @@ func rawRGBToImage(frame []byte, width, height int) image.Image {
 }
 
 // Read the raw RGB pixel data from stdout and convert it to ASCII frames using image2ascii
-func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int) {
+func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	frameSize := width * height * 3 // RGB format, each pixel is 3 bytes (1 byte per color)
 	frameBuffer := make([]byte, frameSize)
 
@@ -111,6 +114,16 @@ func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int) {
 	}
 }
 
+func playAudio(videoFilePath string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	cmd := exec.Command("ffplay", "-nodisp", "-autoexit", "-i", videoFilePath)
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("Error playing audio")
+		panic(err)
+	}
+}
+
 func main() {
 	var videoFilePath string
 	flag.StringVar(&videoFilePath, "video", "", "Video file path you want to playout")
@@ -128,6 +141,11 @@ func main() {
 	}
 
 	frameRate := getVideoFrameRate(videoFilePath)
-	RawRGBToASCII(stdout, frameRate, width, height)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go RawRGBToASCII(stdout, frameRate, width, height, &wg)
+	go playAudio(videoFilePath, &wg)
+	wg.Wait()
 	cmd.Wait()
 }
