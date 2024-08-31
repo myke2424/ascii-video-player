@@ -25,6 +25,11 @@ type Config struct {
 	Grey  bool
 }
 
+// Frame represents a video frame
+type Frame struct {
+	Image image.Image
+}
+
 // Get the terminal size dimensions. If we fail to obtain them, use the defaults provided.
 func getTerminalSize() (int, int) {
 	width, height, err := term.GetSize(int(os.Stdout.Fd()))
@@ -86,30 +91,18 @@ func rawRGBToImage(frame []byte, width, height int) image.Image {
 	return img
 }
 
-// Read the raw RGB pixel data from stdout and convert it to ASCII frames using image2ascii
-func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, grey bool, start chan struct{}, wg *sync.WaitGroup) {
+// BufferFrames reads frames from stdout and stores them in a buffer.
+func BufferFrames(stdout *bufio.Reader, width, height int, buffer chan Frame, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	frameSize := width * height * 3 // RGB format, each pixel is 3 bytes (1 byte per color)
 	frameBuffer := make([]byte, frameSize)
 
-	converter := convert.NewImageConverter()
-	convertOptions := convert.DefaultOptions
-	convertOptions.FixedWidth = width
-	convertOptions.FixedHeight = height
-	convertOptions.Colored = !grey
-
-	// Wait for the start signal to start processing video frames
-	<-start
-
-	startTime := time.Now()
-	frameDuration := time.Second / time.Duration(frameRate)
-
-	frameIndex := 0
 	for {
 		_, err := io.ReadFull(stdout, frameBuffer)
 		if err != nil {
 			if err == io.EOF {
+				close(buffer)
 				break
 			}
 			// If we fail to read a frame, continue to the next frame
@@ -117,7 +110,26 @@ func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, g
 		}
 
 		img := rawRGBToImage(frameBuffer, width, height)
-		asciiArt := converter.Image2ASCIIString(img, &convertOptions)
+		buffer <- Frame{Image: img}
+	}
+}
+
+// Read the buffered frames and convert them to ASCII frames using image2ascii
+func RenderFrames(buffer chan Frame, frameRate float64, width, height int, grey bool, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	converter := convert.NewImageConverter()
+	convertOptions := convert.DefaultOptions
+	convertOptions.FixedWidth = width
+	convertOptions.FixedHeight = height
+	convertOptions.Colored = !grey
+
+	startTime := time.Now()
+	frameDuration := time.Second / time.Duration(frameRate)
+
+	frameIndex := 0
+	for frame := range buffer {
+		asciiArt := converter.Image2ASCIIString(frame.Image, &convertOptions)
 
 		fmt.Print("\033[H\033[2J") // Clear terminal escape sequence
 		fmt.Println(asciiArt)
@@ -163,14 +175,18 @@ func main() {
 
 	frameRate := getVideoFrameRate(config.Video)
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3) // Now we have three goroutines
 
 	start := make(chan struct{})
-	go RawRGBToASCII(stdout, frameRate, width, height, config.Grey, start, &wg)
+
+	// Create a buffered channel to store frames
+	buffer := make(chan Frame, 10) // Buffer size of 10 frames; adjust as needed
+
+	go BufferFrames(stdout, width, height, buffer, &wg)
+	go RenderFrames(buffer, frameRate, width, height, config.Grey, &wg)
 	go playAudio(config.Video, start, &wg)
 
 	// Close the start channel to signal both video/audio goroutines to start.
-	// This will ensure video frame processing / audio playback start at the same time and are in sync.
 	close(start)
 
 	wg.Wait()
