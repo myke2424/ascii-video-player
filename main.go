@@ -49,7 +49,7 @@ func getVideoFrameRate(videoFilePath string) float64 {
 
 // Executes an FFmpeg command to read a video file, downscales it to specified dimensions to fit the terminal,
 // convert it to raw RGB format, and output the raw video data to stdout.
-func convertVideoToRawRGB(videoFilePath string, width, height int) (*exec.Cmd, *bufio.Reader, error) {
+func VideoToRawRGB(videoFilePath string, width, height int) (*exec.Cmd, *bufio.Reader, error) {
 	cmd := exec.Command("ffmpeg", "-i", videoFilePath, "-f", "rawvideo", "-pix_fmt", "rgb24", "-vf", fmt.Sprintf("scale=%d:%d", width, height), "-")
 	stdout, err := cmd.StdoutPipe()
 
@@ -79,8 +79,8 @@ func rawRGBToImage(frame []byte, width, height int) image.Image {
 	return img
 }
 
-// Read the raw pixel data from stdout and convert to ASCII frames using image2ascii
-func convertRawPixelDataToASCII(stdout *bufio.Reader, frameRate float64, width, height int) {
+// Read the raw RGB pixel data from stdout and convert it to ASCII frames using image2ascii
+func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int) {
 	frameSize := width * height * 3 // RGB format, each pixel is 3 bytes (1 byte per color)
 	frameBuffer := make([]byte, frameSize)
 
@@ -121,13 +121,13 @@ func main() {
 	}
 
 	width, height := getTerminalSize()
-	cmd, stdout, err := convertVideoToRawRGB(videoFilePath, width, height)
+	cmd, stdout, err := VideoToRawRGB(videoFilePath, width, height)
 
 	if err != nil {
 		panic(err)
 	}
 
 	frameRate := getVideoFrameRate(videoFilePath)
-	convertRawPixelDataToASCII(stdout, frameRate, width, height)
+	RawRGBToASCII(stdout, frameRate, width, height)
 	cmd.Wait()
 }
