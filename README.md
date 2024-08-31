@@ -11,37 +11,43 @@
 - [Example GIFs](#example-gifs)
 - [Supported Platforms](#supported-platforms)
 - [Dependencies](#dependencies)
+- [Build From Source](#build)
 - [Development Setup](#development-setup)
 
-## How to Use
+## How to Use <a name="how-to-use"></a>
 
 To play a video in the terminal, simply run the following command:
 
 ```bash
-go run main.go --video path/to/video.mp4
+ascii-player --video path/to/video.mp4
 ```
 
 Replace `path/to/video.mp4` with the path to your desired video file or URL.
 
-## Functionality
+## Functionality <a name="functionality"></a>
 
-- [x] Supports RGB colors
+- [x] Supports RGB colors / full greyscale
 - [x] Supports audio playback
-- [x] Simple pause/resume video controls using the spacebar
-- [x] Directly supports YouTube URLs
 - [x] Compatible with any resolution/framerate, automatically downscales to fit the terminal
+- [] Simple pause/resume video controls using the spacebar (TODO)
+- [] Directly supports YouTube URLs (TODO)
 
-## Example GIFs
+## Example GIFs <a name="example-gifs"></a>
 
-## Supported Platforms
+## Supported Platforms <a name="supported-platforms"></a>
 - Linux
 
-## Dependencies
+## Dependencies <a name="dependencies"></a>
 
 - **FFmpeg**: For video decoding and processing.
 - **MediaInfo**: For extracting video metadata.
 
-## Development Setup
+## Build from source <a name="build-from-source"></a>
+```bash
+make build
+```
+
+## Development Setup <a name="development-setup"></a>
 
 To install the development dependencies, run:
 
@@ -50,4 +56,3 @@ make install-dev
 ```
 
 This command installs FFmpeg, MediaInfo, and all Go module dependencies required for development.
-

@@ -1,4 +1,4 @@
-all: install
+all: install build
 
 install-ffmpeg:
 	sudo apt-get update
@@ -14,5 +14,12 @@ install-dev: install
 	go mod tidy
 	go mod download
 
-.PHONY: all install install-ffmpeg install-mediainfo install-dev
+build: 
+	go build -o ascii-player src/main.go src/video.go src/audio.go
+
+clean:
+	rm -f ascii-player
+
+# Declare phony targets to avoid conflicts with files
+.PHONY: all install install-ffmpeg install-mediainfo install-dev build clean
 
