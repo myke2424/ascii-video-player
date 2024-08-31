@@ -1,7 +1,8 @@
 # ASCII Video Player
 **ASCII Video Player** is a terminal-based video player that transforms videos into ASCII art.
 
-![ASCII Video Player Demo](gifs/anime.gif)
+![ASCII Video Player Demo 1](docs/images/lion.png)
+![ASCII Video Player Demo 2](docs/images/goku.png)
 
 ## Table of Contents
 
