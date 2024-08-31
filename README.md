@@ -22,8 +22,6 @@ To play a video in the terminal, simply run the following command:
 ascii-player --video path/to/video.mp4
 ```
 
-Replace `path/to/video.mp4` with the path to your desired video file or URL.
-
 ## Functionality <a name="functionality"></a>
 
 - [x] Supports RGB colors / full greyscale
