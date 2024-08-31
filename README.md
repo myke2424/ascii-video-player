@@ -27,8 +27,8 @@ ascii-player --video path/to/video.mp4
 - [x] Supports RGB colors / full greyscale
 - [x] Supports audio playback
 - [x] Compatible with any resolution/framerate, automatically downscales to fit the terminal
-- [] Simple pause/resume video controls using the spacebar (TODO)
-- [] Directly supports YouTube URLs (TODO)
+- [ ] Simple pause/resume video controls using the spacebar (TODO)
+- [ ] Directly supports YouTube URLs (TODO)
 
 ## Example GIFs <a name="example-gifs"></a>
 
@@ -40,7 +40,7 @@ ascii-player --video path/to/video.mp4
 - **FFmpeg**: For video decoding and processing.
 - **MediaInfo**: For extracting video metadata.
 
-## Build from source <a name="build-from-source"></a>
+## Build from source <a name="build"></a>
 ```bash
 make build
 ```
