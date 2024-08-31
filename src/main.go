@@ -87,7 +87,7 @@ func rawRGBToImage(frame []byte, width, height int) image.Image {
 }
 
 // Read the raw RGB pixel data from stdout and convert it to ASCII frames using image2ascii
-func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, grey bool, wg *sync.WaitGroup) {
+func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, grey bool, start chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	frameSize := width * height * 3 // RGB format, each pixel is 3 bytes (1 byte per color)
@@ -97,13 +97,15 @@ func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, g
 	convertOptions := convert.DefaultOptions
 	convertOptions.FixedWidth = width
 	convertOptions.FixedHeight = height
+	convertOptions.Colored = !grey
 
-	if grey {
-		convertOptions.Colored = false
-	} else {
+	// Wait for the start signal to start processing video frames
+	<-start
 
-		convertOptions.Colored = true
-	}
+	startTime := time.Now()
+	frameDuration := time.Second / time.Duration(frameRate)
+
+	frameIndex := 0
 	for {
 		_, err := io.ReadFull(stdout, frameBuffer)
 		if err != nil {
@@ -120,18 +122,25 @@ func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, g
 		fmt.Print("\033[H\033[2J") // Clear terminal escape sequence
 		fmt.Println(asciiArt)
 
-		// Wait for the next frame
-		time.Sleep(time.Second / time.Duration(frameRate))
+		// Calculate time to sleep until the next frame
+		nextFrameTime := startTime.Add(frameDuration * time.Duration(frameIndex+1))
+		time.Sleep(time.Until(nextFrameTime))
+
+		frameIndex++
 	}
 }
 
-func playAudio(videoFilePath string, wg *sync.WaitGroup) {
+// Plays the audio using ffplay. It waits for the start signal before beginning playback.
+func playAudio(videoFilePath string, start chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
+
+	// Wait for the start signal to start playing audio
+	<-start
+
 	cmd := exec.Command("ffplay", "-nodisp", "-autoexit", "-i", videoFilePath)
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println("Error playing audio")
-		panic(err)
+		fmt.Println("Error playing audio:", err)
 	}
 }
 
@@ -156,8 +165,14 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go RawRGBToASCII(stdout, frameRate, width, height, config.Grey, &wg)
-	go playAudio(config.Video, &wg)
+	start := make(chan struct{})
+	go RawRGBToASCII(stdout, frameRate, width, height, config.Grey, start, &wg)
+	go playAudio(config.Video, start, &wg)
+
+	// Close the start channel to signal both video/audio goroutines to start.
+	// This will ensure video frame processing / audio playback start at the same time and are in sync.
+	close(start)
+
 	wg.Wait()
 	cmd.Wait()
 }
