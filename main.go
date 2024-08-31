@@ -5,20 +5,20 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"image"
+	"image/color"
 	"io"
-	"math"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/qeesung/image2ascii/convert"
 	"golang.org/x/term"
 )
 
-// TODO: Extract resolution from the video? and Frame rate?
-
-// Get the terminal size dimensions. If we failed to obtain them, use the defaults provided.
+// Get the terminal size dimensions. If we fail to obtain them, use the defaults provided.
 func getTerminalSize() (int, int) {
 	width, height, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
@@ -47,9 +47,9 @@ func getVideoFrameRate(videoFilePath string) float64 {
 	return frameRate
 }
 
-// Executes an FFmpeg command to read a video file, resize it to specified dimensions to fit the terminal,
+// Executes an FFmpeg command to read a video file, downscales it to specified dimensions to fit the terminal,
 // convert it to raw RGB format, and output the raw video data to stdout.
-func convertVideoToRawRGB(videoFilePath string, width int, height int) (*exec.Cmd, io.ReadCloser, error) {
+func convertVideoToRawRGB(videoFilePath string, width, height int) (*exec.Cmd, *bufio.Reader, error) {
 	cmd := exec.Command("ffmpeg", "-i", videoFilePath, "-f", "rawvideo", "-pix_fmt", "rgb24", "-vf", fmt.Sprintf("scale=%d:%d", width, height), "-")
 	stdout, err := cmd.StdoutPipe()
 
@@ -61,68 +61,50 @@ func convertVideoToRawRGB(videoFilePath string, width int, height int) (*exec.Cm
 		return nil, nil, fmt.Errorf("error starting ffmpeg command to decode video to raw pixel data: %v", err)
 	}
 
-	return cmd, stdout, nil
-
+	return cmd, bufio.NewReader(stdout), nil
 }
 
-// TODO: 8x8 characters?, pixel 1x1, text8x8
-// downscale video, divide image by resolution of text (divide by 8)
-// quantize luminance to smaller set of values (10 values maybe)?
-// edge detective (sobel filter, canny edge, difference of guassaisns)?
-// Compute shader?
-// edge-detector???
-// use lower contrest color combo instead of black and white
-// depth of field effect
-
-// Converts a raw RGB frame to an ASCII art string
-func convertFrameToASCII(frame []byte, width int, height int) string {
-	// More detailed ASCII characters from dark to light
-	asciiChars := " .`-^\",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
-
-	var buffer bytes.Buffer
-	for i := 0; i < len(frame); i += 3 {
-		r := frame[i]
-		g := frame[i+1]
-		b := frame[i+2]
-
-		// Calculate the grayscale value with gamma correction
-		gray := 0.299*math.Pow(float64(r)/255.0, 2.2) +
-			0.587*math.Pow(float64(g)/255.0, 2.2) +
-			0.114*math.Pow(float64(b)/255.0, 2.2)
-		gray = math.Pow(gray, 1.0/2.2)
-
-		// Map grayscale to an ASCII character
-		asciiIndex := int(gray * float64(len(asciiChars)-1))
-		buffer.WriteByte(asciiChars[asciiIndex])
-
-		// Add newline at the end of each row
-		if (i/3+1)%width == 0 {
-			buffer.WriteByte('\n')
+// Convert raw RGB frame data to an image.Image object
+func rawRGBToImage(frame []byte, width, height int) image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			offset := (y*width + x) * 3
+			r := frame[offset]
+			g := frame[offset+1]
+			b := frame[offset+2]
+			img.Set(x, y, color.RGBA{r, g, b, 255})
 		}
 	}
-	return buffer.String()
+	return img
 }
 
-// Read the raw pixel data from stdout and convert to ASCII frames
-func convertRawPixelDataToASCII(stdout io.ReadCloser, frameRate float64, width int, height int) {
-	reader := bufio.NewReader(stdout)
+// Read the raw pixel data from stdout and convert to ASCII frames using image2ascii
+func convertRawPixelDataToASCII(stdout *bufio.Reader, frameRate float64, width, height int) {
 	frameSize := width * height * 3 // RGB format, each pixel is 3 bytes (1 byte per color)
 	frameBuffer := make([]byte, frameSize)
 
+	converter := convert.NewImageConverter()
+	convertOptions := convert.DefaultOptions
+	convertOptions.FixedWidth = width
+	convertOptions.FixedHeight = height
+	convertOptions.Colored = true
+
 	for {
-		_, err := io.ReadFull(reader, frameBuffer)
+		_, err := io.ReadFull(stdout, frameBuffer)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			// if we fail to read a frame, continue to the next frame
+			// If we fail to read a frame, continue to the next frame
 			continue
 		}
 
-		asciiFrame := convertFrameToASCII(frameBuffer, width, height)
+		img := rawRGBToImage(frameBuffer, width, height)
+		asciiArt := converter.Image2ASCIIString(img, &convertOptions)
 
 		fmt.Print("\033[H\033[2J") // Clear terminal escape sequence
-		fmt.Println(asciiFrame)
+		fmt.Println(asciiArt)
 
 		// Wait for the next frame
 		time.Sleep(time.Second / time.Duration(frameRate))
