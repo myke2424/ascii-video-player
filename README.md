@@ -16,9 +16,9 @@
 
 To play a video in the terminal, simply run the following command:
 
-\```bash
+```bash
 go run main.go --video path/to/video.mp4
-\```
+```
 
 Replace `path/to/video.mp4` with the path to your desired video file or URL.
 
