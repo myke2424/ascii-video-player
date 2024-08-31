@@ -19,6 +19,12 @@ import (
 	"golang.org/x/term"
 )
 
+// CLI Args
+type Config struct {
+	Video string
+	Grey  bool
+}
+
 // Get the terminal size dimensions. If we fail to obtain them, use the defaults provided.
 func getTerminalSize() (int, int) {
 	width, height, err := term.GetSize(int(os.Stdout.Fd()))
@@ -81,7 +87,7 @@ func rawRGBToImage(frame []byte, width, height int) image.Image {
 }
 
 // Read the raw RGB pixel data from stdout and convert it to ASCII frames using image2ascii
-func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, wg *sync.WaitGroup) {
+func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, grey bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	frameSize := width * height * 3 // RGB format, each pixel is 3 bytes (1 byte per color)
@@ -91,8 +97,13 @@ func RawRGBToASCII(stdout *bufio.Reader, frameRate float64, width, height int, w
 	convertOptions := convert.DefaultOptions
 	convertOptions.FixedWidth = width
 	convertOptions.FixedHeight = height
-	convertOptions.Colored = true
 
+	if grey {
+		convertOptions.Colored = false
+	} else {
+
+		convertOptions.Colored = true
+	}
 	for {
 		_, err := io.ReadFull(stdout, frameBuffer)
 		if err != nil {
@@ -125,27 +136,28 @@ func playAudio(videoFilePath string, wg *sync.WaitGroup) {
 }
 
 func main() {
-	var videoFilePath string
-	flag.StringVar(&videoFilePath, "video", "", "Video file path you want to playout")
+	var config Config
+	flag.StringVar(&config.Video, "video", "", "Video file path you want to playout - required")
+	flag.BoolVar(&config.Grey, "grey", false, "Render greyscale. If not passed in, use RGB  - not required.")
 	flag.Parse()
 
-	if len(videoFilePath) == 0 {
+	if len(config.Video) == 0 {
 		panic("--video flag is required. Please provide a file path to the video you want to playout using this flag")
 	}
 
 	width, height := getTerminalSize()
-	cmd, stdout, err := VideoToRawRGB(videoFilePath, width, height)
+	cmd, stdout, err := VideoToRawRGB(config.Video, width, height)
 
 	if err != nil {
 		panic(err)
 	}
 
-	frameRate := getVideoFrameRate(videoFilePath)
+	frameRate := getVideoFrameRate(config.Video)
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go RawRGBToASCII(stdout, frameRate, width, height, &wg)
-	go playAudio(videoFilePath, &wg)
+	go RawRGBToASCII(stdout, frameRate, width, height, config.Grey, &wg)
+	go playAudio(config.Video, &wg)
 	wg.Wait()
 	cmd.Wait()
 }
