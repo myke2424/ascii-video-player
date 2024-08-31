@@ -22,37 +22,29 @@ func (c *Config) ParseCliArgs() {
 }
 
 func main() {
-	// Parse CLI arguments
 	var cfg Config
 	cfg.ParseCliArgs()
-
 	width, height := GetTerminalSize()
 
-	// Initialize video processing
 	videoCmd, stdout, err := VideoToRawRGB(cfg.Video, width, height)
 	if err != nil {
 		log.Fatalf("Failed to initialize video processing: %v", err)
 	}
 	defer videoCmd.Wait()
-
 	frameRate := GetVideoFrameRate(cfg.Video)
 
-	// Set up synchronization
 	var wg sync.WaitGroup
-	start := make(chan struct{})
-
-	// Frame buffer channel
-	buffer := make(chan Frame, 10)
+	start := make(chan struct{}) // channel to enforce synchronization between video/audio
+	frameBuffer := make(chan Frame, 10)
 
 	wg.Add(3)
 
-	// Start video, ASCII, and audio processing in separate goroutines
-	go BufferFrames(stdout, width, height, buffer, &wg)
-	go RenderFrames(buffer, frameRate, width, height, cfg.Grey, &wg)
+	go BufferFrames(stdout, width, height, frameBuffer, &wg)
+	go RenderFrames(frameBuffer, frameRate, width, height, cfg.Grey, start, &wg)
 	go PlayAudio(cfg.Video, start, &wg)
 
+	// Close the start channel to signal both video/audio goroutines to start.
+	// This will ensure rendering frames and audio playback are in sync
 	close(start)
-
-	// Wait for all goroutines to finish
 	wg.Wait()
 }

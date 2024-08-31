@@ -107,7 +107,7 @@ func rawRGBToImage(frame []byte, width, height int) image.Image {
 }
 
 // RenderFrames reads buffered frames and converts them to ASCII
-func RenderFrames(buffer chan Frame, frameRate float64, width, height int, grey bool, wg *sync.WaitGroup) {
+func RenderFrames(buffer chan Frame, frameRate float64, width, height int, grey bool, start chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	converter := convert.NewImageConverter()
@@ -118,6 +118,7 @@ func RenderFrames(buffer chan Frame, frameRate float64, width, height int, grey 
 
 	startTime := time.Now()
 	frameDuration := time.Second / time.Duration(frameRate)
+	<-start // Wait for the signal to start rendering - used to sync with audio
 
 	frameIndex := 0
 	for frame := range buffer {
