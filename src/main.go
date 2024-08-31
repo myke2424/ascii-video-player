@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -23,6 +24,16 @@ import (
 type Config struct {
 	Video string
 	Grey  bool
+}
+
+func (c *Config) ParseCliArgs() {
+	flag.StringVar(&c.Video, "video", "", "Video file path you want to playout - required")
+	flag.BoolVar(&c.Grey, "grey", false, "Render greyscale. If not passed in, use RGB - not required.")
+	flag.Parse()
+
+	if len(c.Video) == 0 {
+		log.Fatal("--video flag is required. Please provide a file path to the video you want to playout using this flag")
+	}
 }
 
 // Frame represents a video frame
@@ -158,13 +169,7 @@ func playAudio(videoFilePath string, start chan struct{}, wg *sync.WaitGroup) {
 
 func main() {
 	var config Config
-	flag.StringVar(&config.Video, "video", "", "Video file path you want to playout - required")
-	flag.BoolVar(&config.Grey, "grey", false, "Render greyscale. If not passed in, use RGB  - not required.")
-	flag.Parse()
-
-	if len(config.Video) == 0 {
-		panic("--video flag is required. Please provide a file path to the video you want to playout using this flag")
-	}
+	config.ParseCliArgs()
 
 	width, height := getTerminalSize()
 	cmd, stdout, err := VideoToRawRGB(config.Video, width, height)
