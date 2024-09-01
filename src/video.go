@@ -107,14 +107,14 @@ func rawRGBToImage(frame []byte, width, height int) image.Image {
 }
 
 // RenderFrames reads buffered frames and converts them to ASCII
-func RenderFrames(buffer chan Frame, frameRate float64, width, height int, grey bool, start chan struct{}, wg *sync.WaitGroup) {
+func RenderFrames(buffer chan Frame, frameRate float64, width, height int, useGreyScale bool, start chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	converter := convert.NewImageConverter()
 	convertOptions := convert.DefaultOptions
 	convertOptions.FixedWidth = width
 	convertOptions.FixedHeight = height
-	convertOptions.Colored = !grey
+	convertOptions.Colored = !useGreyScale
 
 	startTime := time.Now()
 	frameDuration := time.Second / time.Duration(frameRate)

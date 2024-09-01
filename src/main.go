@@ -3,21 +3,28 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 	"sync"
 )
 
 type Config struct {
-	Video string
-	Grey  bool
+	VideoPath    string
+	UseGreyScale bool
 }
 
 func (c *Config) ParseCliArgs() {
-	flag.StringVar(&c.Video, "video", "", "Video file path you want to playout - required")
-	flag.BoolVar(&c.Grey, "grey", false, "Render greyscale. If not passed in, use RGB - not required.")
+	flag.StringVar(&c.VideoPath, "video", "", "Video file path you want to playout - required")
+	flag.BoolVar(&c.UseGreyScale, "grey", false, "Render greyscale. If not passed in, use RGB - not required.")
 	flag.Parse()
 
-	if len(c.Video) == 0 {
+	if len(c.VideoPath) == 0 {
 		log.Fatal("--video flag is required. Please provide a file path to the video you want to playout using this flag")
+	}
+
+	_, err := os.Stat(c.VideoPath)
+
+	if os.IsNotExist(err) {
+		log.Fatalf("The given video file path does not exist: [%s]", c.VideoPath)
 	}
 }
 
@@ -26,12 +33,12 @@ func main() {
 	cfg.ParseCliArgs()
 	width, height := GetTerminalSize()
 
-	videoCmd, stdout, err := VideoToRawRGB(cfg.Video, width, height)
+	videoCmd, stdout, err := VideoToRawRGB(cfg.VideoPath, width, height)
 	if err != nil {
 		log.Fatalf("Failed to initialize video processing: %v", err)
 	}
 	defer videoCmd.Wait()
-	frameRate := GetVideoFrameRate(cfg.Video)
+	frameRate := GetVideoFrameRate(cfg.VideoPath)
 
 	var wg sync.WaitGroup
 	start := make(chan struct{}) // channel to enforce synchronization between video/audio
@@ -40,8 +47,8 @@ func main() {
 	wg.Add(3)
 
 	go BufferFrames(stdout, width, height, frameBuffer, &wg)
-	go RenderFrames(frameBuffer, frameRate, width, height, cfg.Grey, start, &wg)
-	go PlayAudio(cfg.Video, start, &wg)
+	go RenderFrames(frameBuffer, frameRate, width, height, cfg.UseGreyScale, start, &wg)
+	go PlayAudio(cfg.VideoPath, start, &wg)
 
 	// Close the start channel to signal both video/audio goroutines to start.
 	// This will ensure rendering frames and audio playback are in sync
