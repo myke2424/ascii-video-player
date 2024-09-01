@@ -44,8 +44,8 @@ func (r *Renderer) BufferFrames(stdout *bufio.Reader, wg *sync.WaitGroup) {
 			continue
 		}
 
-		img := r.rawRGBToImage(frameBuffer, r.width, r.height)
-		r.frameChannel <- Frame{Image: img}
+		frame := r.rawRGBToFrame(frameBuffer, r.width, r.height)
+		r.frameChannel <- frame
 	}
 }
 
@@ -80,8 +80,8 @@ func (r *Renderer) renderFrame(frame Frame, imageConverter *convert.ImageConvert
 	fmt.Println(asciiArt)
 }
 
-// rawRGBToImage converts raw RGB frame data to an image.Image object
-func (r *Renderer) rawRGBToImage(frame []byte, width, height int) image.Image {
+// rawRGBToImage converts raw RGB frame bytes to a Frame struct
+func (r *Renderer) rawRGBToFrame(frame []byte, width, height int) Frame {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
@@ -92,5 +92,5 @@ func (r *Renderer) rawRGBToImage(frame []byte, width, height int) image.Image {
 			img.Set(x, y, color.RGBA{r, g, b, 255})
 		}
 	}
-	return img
+	return Frame{Image: img}
 }
