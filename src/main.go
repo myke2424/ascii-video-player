@@ -7,11 +7,13 @@ import (
 	"sync"
 )
 
+// Config contains all the CLI args
 type Config struct {
 	VideoPath    string
 	UseGreyScale bool
 }
 
+// Parse the cli args, validate the file exists that we want to process
 func (c *Config) ParseCliArgs() {
 	flag.StringVar(&c.VideoPath, "video", "", "Video file path you want to playout - required")
 	flag.BoolVar(&c.UseGreyScale, "grey", false, "Render greyscale. If not passed in, use RGB - not required.")
@@ -28,12 +30,19 @@ func (c *Config) ParseCliArgs() {
 	}
 }
 
+/*
+Runs the ASCII video player.
+
+It decodes the video to raw RGB, buffers the frames, renders them as ASCII art,
+and plays the audio in sync with the video. Uses a start channel to kick off
+video rendering and audio playback at the same time.
+*/
 func main() {
 	var cfg Config
 	cfg.ParseCliArgs()
 	width, height := GetTerminalSize()
 
-	videoCmd, stdout, err := VideoToRawRGB(cfg.VideoPath, width, height)
+	videoCmd, stdout, err := DecodeVideoToRawRGB(cfg.VideoPath, width, height)
 	if err != nil {
 		log.Fatalf("Failed to initialize video processing: %v", err)
 	}
@@ -41,13 +50,14 @@ func main() {
 	frameRate := GetVideoFrameRate(cfg.VideoPath)
 
 	var wg sync.WaitGroup
-	start := make(chan struct{}) // channel to enforce synchronization between video/audio
-	frameBuffer := make(chan Frame, 10)
-
 	wg.Add(3)
 
-	go BufferFrames(stdout, width, height, frameBuffer, &wg)
-	go RenderFrames(frameBuffer, frameRate, width, height, cfg.UseGreyScale, start, &wg)
+	start := make(chan struct{})         // channel to enforce synchronization between video/audio
+	frameChannel := make(chan Frame, 10) // channel used to buffer frames for rendering
+	renderer := Renderer{width: width, height: height, frameRate: frameRate, useGreyScale: cfg.UseGreyScale, frameChannel: frameChannel}
+
+	go renderer.BufferFrames(stdout, &wg)
+	go renderer.RenderFrames(start, &wg)
 	go PlayAudio(cfg.VideoPath, start, &wg)
 
 	// Close the start channel to signal both video/audio goroutines to start.

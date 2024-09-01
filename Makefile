@@ -15,7 +15,7 @@ install-dev: install
 	go mod download
 
 build: 
-	go build -o ascii-player src/main.go src/video.go src/audio.go
+	go build -o ascii-player src/main.go src/video.go src/audio.go src/renderer.go
 
 clean:
 	rm -f ascii-player
