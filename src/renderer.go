@@ -65,7 +65,7 @@ func (r *Renderer) RenderFrames(start chan struct{}, wg *sync.WaitGroup) {
 
 	frameIndex := 0
 	for frame := range r.frameChannel {
-		r.renderFrame(frame, converter, convertOptions)
+		r.renderFrame(frame, converter, &convertOptions)
 		// Calculate time to sleep until the next frame
 		nextFrameTime := startTime.Add(frameDuration * time.Duration(frameIndex+1))
 		time.Sleep(time.Until(nextFrameTime))
@@ -74,8 +74,8 @@ func (r *Renderer) RenderFrames(start chan struct{}, wg *sync.WaitGroup) {
 }
 
 // RenderFrame renders a single video frame as ASCII
-func (r *Renderer) renderFrame(frame Frame, imageConverter *convert.ImageConverter, converterOptions convert.Options) {
-	asciiArt := imageConverter.Image2ASCIIString(frame.Image, &converterOptions)
+func (r *Renderer) renderFrame(frame Frame, imageConverter *convert.ImageConverter, converterOptions *convert.Options) {
+	asciiArt := imageConverter.Image2ASCIIString(frame.Image, converterOptions)
 	fmt.Print("\033[H\033[2J") // Clear terminal escape sequence
 	fmt.Println(asciiArt)
 }
